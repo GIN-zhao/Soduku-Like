@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数独 - Sudoku</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+        }
+
+        .board-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .sudoku-board {
+            display: grid;
+            grid-template-columns: 30px repeat(9, 1fr);
+            gap: 2px;
+            background: #333;
+            border: 3px solid #333;
+            margin: 0 auto;
+            max-width: 650px;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+            position: relative;
+        }
+
+        .row-label,
+        .col-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #78909c;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            position: relative;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .row-label {
+            font-size: 10px;
+            line-height: 1.1;
+        }
+
+        .line-number {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .reward-number {
+            font-size: 13px;
+            font-weight: bold;
+            color: #ffeb3b;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 1px 0;
+        }
+
+        .refresh-count {
+            font-size: 8px;
+            color: #b0bec5;
+            margin-top: 1px;
+        }
+
+        .refresh-count.zero {
+            color: #f44336;
+        }
+
+        .corner-label {
+            background: #546e7a;
+        }
+
+        .cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .cell.empty {
+            background: #f0f0f0;
+        }
+
+        .cell.number {
+            background: #e3f2fd;
+        }
+
+        .cell.monster {
+            background: #ffebee;
+        }
+
+        .cell.monster::after {
+            content: '👹';
+            position: absolute;
+            font-size: 16px;
+            top: 2px;
+            right: 2px;
+        }
+
+        .cell.frozen {
+            background: #e1f5fe;
+            border: 2px solid #00bcd4;
+        }
+
+        .cell.selected {
+            border: 3px solid #ff9800 !important;
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+        }
+
+        .cell.targeted {
+            border: 3px solid #f44336 !important;
+            box-shadow: 0 0 15px rgba(244, 67, 54, 0.7);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .cell.box-border-right {
+            border-right: 3px solid #333;
+        }
+
+        .cell.box-border-bottom {
+            border-bottom: 3px solid #333;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .panel h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat {
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .inventory {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .inventory-item {
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .inventory-item:hover {
+            background: #e3f2fd;
+        }
+
+        .inventory-item.selected {
+            border-color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .inventory-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .inventory-count {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #78909c;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #607d8b;
+        }
+
+        .btn-danger {
+            background: #ef5350;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53935;
+        }
+
+        .game-log {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            padding: 5px;
+            margin-bottom: 5px;
+            background: #f5f5f5;
+            border-radius: 3px;
+            border-left: 3px solid #667eea;
+        }
+
+        .log-entry.danger {
+            border-left-color: #f44336;
+        }
+
+        .log-entry.success {
+            border-left-color: #4caf50;
+        }
+
+        .log-entry.warning {
+            border-left-color: #ff9800;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #667eea;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // 游戏常量
+        const BOARD_SIZE = 9;
+        const INITIAL_HP = 100;
+        const INITIAL_REFRESH_COUNT = 1;  // 降低初始刷新次数
+        const INITIAL_INVENTORY = {
+            1: 3, 2: 3, 3: 3, 4: 2, 5: 2, 6: 2, 7: 2, 8: 1, 9: 1  // 增加初始库存
+        };
+
+        // 格子类型
+        const CELL_TYPE = {
+            EMPTY: 'empty',
+            NUMBER: 'number',
+            MONSTER: 'monster'
+        };
+
+        // 怪物类型
+        const MONSTER_TYPE = {
+            NORMAL: 'normal',
+            ELITE: 'elite',
+            BOSS: 'boss'
+        };
+
+        // 区域类型
+        const AREA_TYPE = {
+            FARM: 'farm',      // 每回合治疗2
+            MINE: 'mine',      // 每回合获取2个随机数字
+            FACTORY: 'factory' // 每回合获得分数
+        };
+
+        // 初始化棋盘
+        const initializeBoard = () => {
+            const board = [];
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                board[i] = [];
+                for (let j = 0; j < BOARD_SIZE; j++) {
+                    board[i][j] = {
+                        value: 0,
+                        type: CELL_TYPE.EMPTY,
+                        monsterType: null,
+                        frozenTurns: 0
+                    };
+                }
+            }
+            return board;
+        };
+
+        // 初始化刷新次数
+        const initializeRefreshCounts = () => {
+            return {
+                rows: Array(BOARD_SIZE).fill(INITIAL_REFRESH_COUNT),
+                cols: Array(BOARD_SIZE).fill(INITIAL_REFRESH_COUNT)
+            };
+        };
+
+        // 初始化行列奖励数字（随机）
+        const initializeLineRewards = () => {
+            const rowRewards = [];
+            const colRewards = [];
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                // 随机生成奖励数字（1-9）和数量（1-3）
+                rowRewards.push({
+                    number: Math.floor(Math.random() * 9) + 1,
+                    count: Math.floor(Math.random() * 3) + 1  // 1-3个
+                });
+                colRewards.push({
+                    number: Math.floor(Math.random() * 9) + 1,
+                    count: Math.floor(Math.random() * 3) + 1  // 1-3个
+                });
+            }
+            return { rows: rowRewards, cols: colRewards };
+        };
+
+        // 初始化九宫格区域
+        const initializeBoxAreas = () => {
+            const areas = [];
+            // 为所有9个九宫格分配区域：3农场、3矿洞、3工厂
+            const areaTypes = [
+                AREA_TYPE.FARM, AREA_TYPE.FARM, AREA_TYPE.FARM,
+                AREA_TYPE.MINE, AREA_TYPE.MINE, AREA_TYPE.MINE,
+                AREA_TYPE.FACTORY, AREA_TYPE.FACTORY, AREA_TYPE.FACTORY
+            ];
+
+            // 随机打乱
+            for (let i = areaTypes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [areaTypes[i], areaTypes[j]] = [areaTypes[j], areaTypes[i]];
+            }
+
+            for (let i = 0; i < 9; i++) {
+                areas.push(areaTypes[i]);
+            }
+
+            return areas;
+        };
+
+        // 检查是否在九宫格边界（用于显示边框）
+        const isBoxBorder = (row, col) => {
+            return {
+                right: (col + 1) % 3 === 0 && col < 8,
+                bottom: (row + 1) % 3 === 0 && row < 8
+            };
+        };
+
+        // 获取九宫格索引
+        const getBoxIndex = (row, col) => {
+            return Math.floor(row / 3) * 3 + Math.floor(col / 3);
+        };
+
+        // 检查在某个位置放置数字是否有效
+        const isValidPlacement = (board, row, col, value) => {
+            // 检查行
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if (board[row][c].value === value) {
+                    return false;
+                }
+            }
+            // 检查列
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                if (board[r][col].value === value) {
+                    return false;
+                }
+            }
+            // 检查九宫格
+            const boxStartRow = Math.floor(row / 3) * 3;
+            const boxStartCol = Math.floor(col / 3) * 3;
+            for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+                for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                    if (board[r][c].value === value) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        // 检查某个位置是否已经造成冲突（返回冲突数量）
+        const checkConflictsAt = (board, row, col) => {
+            const value = board[row][col].value;
+            if (value === 0) return 0;
+
+            let conflicts = 0;
+
+            // 检查行冲突
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if (c !== col && board[row][c].value === value) {
+                    conflicts++;
+                }
+            }
+
+            // 检查列冲突
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                if (r !== row && board[r][col].value === value) {
+                    conflicts++;
+                }
+            }
+
+            // 检查九宫格冲突
+            const boxStartRow = Math.floor(row / 3) * 3;
+            const boxStartCol = Math.floor(col / 3) * 3;
+            for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+                for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                    if ((r !== row || c !== col) && board[r][c].value === value) {
+                        conflicts++;
+                    }
+                }
+            }
+
+            return conflicts;
+        };
+
+        // 生成初始数独布局
+        const generateInitialSudoku = (board) => {
+            const newBoard = board.map(row => row.map(cell => ({ ...cell })));
+
+            // 为每个格子尝试生成数字（约30-40%的格子会有初始数字）
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    // 35%的概率生成数字
+                    if (Math.random() < 0.35) {
+                        // 尝试放置一个随机数字
+                        const attempts = [];
+                        for (let num = 1; num <= 9; num++) {
+                            attempts.push(num);
+                        }
+                        // 随机打乱尝试顺序
+                        for (let i = attempts.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [attempts[i], attempts[j]] = [attempts[j], attempts[i]];
+                        }
+
+                        // 尝试放置
+                        for (const num of attempts) {
+                            if (isValidPlacement(newBoard, row, col, num)) {
+                                newBoard[row][col] = {
+                                    value: num,
+                                    type: CELL_TYPE.NUMBER,
+                                    monsterType: null,
+                                    frozenTurns: 0
+                                };
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 确保至少有一些初始数字（如果太少，再补充一些）
+            let filledCount = 0;
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    if (newBoard[row][col].value > 0) {
+                        filledCount++;
+                    }
+                }
+            }
+
+            // 如果填充的格子少于20个，强制补充到至少20个
+            if (filledCount < 20) {
+                const emptyCells = [];
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    for (let col = 0; col < BOARD_SIZE; col++) {
+                        if (newBoard[row][col].value === 0) {
+                            emptyCells.push({ row, col });
+                        }
+                    }
+                }
+
+                // 随机打乱空格子
+                for (let i = emptyCells.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [emptyCells[i], emptyCells[j]] = [emptyCells[j], emptyCells[i]];
+                }
+
+                let added = 0;
+                for (const { row, col } of emptyCells) {
+                    if (added >= 20 - filledCount) break;
+
+                    const attempts = [];
+                    for (let num = 1; num <= 9; num++) {
+                        attempts.push(num);
+                    }
+                    // 随机打乱尝试顺序
+                    for (let i = attempts.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [attempts[i], attempts[j]] = [attempts[j], attempts[i]];
+                    }
+
+                    for (const num of attempts) {
+                        if (isValidPlacement(newBoard, row, col, num)) {
+                            newBoard[row][col] = {
+                                value: num,
+                                type: CELL_TYPE.NUMBER,
+                                monsterType: null,
+                                frozenTurns: 0
+                            };
+                            added++;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return newBoard;
+        };
+
+        // 主游戏组件
+        const Game = () => {
+            const [board, setBoard] = useState(() => generateInitialSudoku(initializeBoard()));
+            const [inventory, setInventory] = useState(INITIAL_INVENTORY);
+            const [score, setScore] = useState(0);
+            const [turn, setTurn] = useState(1);
+            const [playerHP, setPlayerHP] = useState(INITIAL_HP);
+            const [refreshCounts, setRefreshCounts] = useState(initializeRefreshCounts());
+            const [lineRewards, setLineRewards] = useState(initializeLineRewards());
+            const [boxAreas, setBoxAreas] = useState(initializeBoxAreas());
+            const [activeAreaEffects, setActiveAreaEffects] = useState([]);
+            const [selectedNumber, setSelectedNumber] = useState(null);
+            const [selectedCell, setSelectedCell] = useState(null);
+            const [targetedMonster, setTargetedMonster] = useState(null); // {row, col}
+            const [operationMode, setOperationMode] = useState('add'); // add 或 subtract
+            const [gameLog, setGameLog] = useState([]);
+
+            // 使用ref存储当前turn值，避免addLog依赖turn导致无限循环
+            const turnRef = useRef(turn);
+            turnRef.current = turn;
+
+            // 添加日志
+            const addLog = useCallback((message, type = 'normal') => {
+                setGameLog(prev => [...prev.slice(-50), { message, type, turn: turnRef.current }]);
+            }, []);
+
+            // 初始化日志
+            useEffect(() => {
+                const initialCount = board.flat().filter(c => c.value > 0).length;
+                addLog(`游戏开始！棋盘已预置 ${initialCount} 个数字。`, 'success');
+                addLog('完成行列或九宫格可以获得数字奖励。', 'success');
+                addLog('点击怪物可以瞄准它，完成后会击杀被瞄准的怪物。', 'success');
+                addLog('警告：当数字库存耗尽时，游戏结束！', 'danger');
+                addLog('提示：数字格子>=10会生成怪物，>=20会生成精英怪物。', 'warning');
+            }, []);
+
+            // 检查瞄准的怪物是否还存在
+            useEffect(() => {
+                if (targetedMonster) {
+                    const { row, col } = targetedMonster;
+                    if (board[row][col].type !== CELL_TYPE.MONSTER) {
+                        setTargetedMonster(null);
+                        addLog('瞄准的怪物已消失', 'warning');
+                    }
+                }
+            }, [board]);
+
+            // 检查并完成行/列/九宫格
+            const checkCompletions = useCallback((currentBoard, startingInventory = null) => {
+                let newInventory = startingInventory ? { ...startingInventory } : { ...inventory };
+                let completedAreas = [];
+                let damageTaken = 0;
+                let hasCompleted = false; // 跟踪是否有任何完成
+
+                // 击杀瞄准的怪物函数
+                const killTargetedMonster = () => {
+                    if (targetedMonster) {
+                        const { row, col } = targetedMonster;
+                        if (currentBoard[row][col].type === CELL_TYPE.MONSTER) {
+                            const monsterType = currentBoard[row][col].monsterType;
+                            const monsterName = monsterType === MONSTER_TYPE.ELITE ? '精英怪物' : '怪物';
+                            const reward = monsterType === MONSTER_TYPE.ELITE ? 50 : 20;
+                            addLog(`🎯 瞄准击杀：${monsterName}（${row + 1}, ${col + 1}）+${reward}分`, 'success');
+                            setScore(prev => prev + reward);
+
+                            // 移除怪物
+                            currentBoard[row][col] = {
+                                value: 0,
+                                type: CELL_TYPE.EMPTY,
+                                monsterType: null,
+                                frozenTurns: 0
+                            };
+
+                            // 清除瞄准
+                            setTargetedMonster(null);
+                        } else {
+                            addLog('瞄准的目标已不存在', 'warning');
+                            setTargetedMonster(null);
+                        }
+                    }
+                };
+
+                // 检查行
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    const values = [];
+                    let hasEmpty = false;
+                    for (let col = 0; col < BOARD_SIZE; col++) {
+                        if (currentBoard[row][col].value === 0) {
+                            hasEmpty = true;
+                            break;
+                        }
+                        values.push(currentBoard[row][col].value);
+                    }
+
+                    if (!hasEmpty) {
+                        const uniqueValues = new Set(values);
+                        if (uniqueValues.size === 9) {
+                            // 行完成
+                            hasCompleted = true;
+                            addLog(`第${row + 1}行完成！`, 'success');
+                            const reward = lineRewards.rows[row];  // 使用随机的奖励数字和数量
+                            newInventory[reward.number] = (newInventory[reward.number] || 0) + reward.count;
+                            addLog(`获得奖励：${reward.number} x ${reward.count}`, 'success');
+                            setScore(prev => prev + 100);
+
+                            // 击杀瞄准的怪物
+                            killTargetedMonster();
+
+                            // 刷新该行
+                            if (refreshCounts.rows[row] > 0) {
+                                let skippedFrozen = 0;
+                                let clearedCells = 0;
+                                for (let col = 0; col < BOARD_SIZE; col++) {
+                                    // 跳过冻结的格子
+                                    if (currentBoard[row][col].frozenTurns > 0) {
+                                        skippedFrozen++;
+                                        continue;
+                                    }
+                                    // 记录清空的格子
+                                    if (currentBoard[row][col].value > 0 || currentBoard[row][col].type === CELL_TYPE.MONSTER) {
+                                        clearedCells++;
+                                    }
+                                    currentBoard[row][col] = {
+                                        value: 0,
+                                        type: CELL_TYPE.EMPTY,
+                                        monsterType: null,
+                                        frozenTurns: 0
+                                    };
+                                }
+                                setRefreshCounts(prev => ({
+                                    ...prev,
+                                    rows: prev.rows.map((count, idx) => idx === row ? count - 1 : count)
+                                }));
+                                addLog(`第${row + 1}行刷新：清空${clearedCells}个格子`, 'normal');
+                                if (skippedFrozen > 0) {
+                                    addLog(`跳过了${skippedFrozen}个冻结的格子`, 'warning');
+                                }
+                            } else {
+                                // 锁定该行，所有格子冻结
+                                for (let col = 0; col < BOARD_SIZE; col++) {
+                                    currentBoard[row][col].frozenTurns = 5;
+                                }
+                                addLog(`第${row + 1}行刷新次数耗尽，已锁定`, 'warning');
+                            }
+                        } else {
+                            // 有冲突，扣血
+                            damageTaken += 1;
+                        }
+                    }
+                }
+
+                // 检查列
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    const values = [];
+                    let hasEmpty = false;
+                    for (let row = 0; row < BOARD_SIZE; row++) {
+                        if (currentBoard[row][col].value === 0) {
+                            hasEmpty = true;
+                            break;
+                        }
+                        values.push(currentBoard[row][col].value);
+                    }
+
+                    if (!hasEmpty) {
+                        const uniqueValues = new Set(values);
+                        if (uniqueValues.size === 9) {
+                            // 列完成
+                            hasCompleted = true;
+                            addLog(`第${col + 1}列完成！`, 'success');
+                            const reward = lineRewards.cols[col];  // 使用随机的奖励数字和数量
+                            newInventory[reward.number] = (newInventory[reward.number] || 0) + reward.count;
+                            addLog(`获得奖励：${reward.number} x ${reward.count}`, 'success');
+                            setScore(prev => prev + 100);
+
+                            // 击杀瞄准的怪物
+                            killTargetedMonster();
+
+                            // 刷新该列
+                            if (refreshCounts.cols[col] > 0) {
+                                let skippedFrozen = 0;
+                                let clearedCells = 0;
+                                for (let row = 0; row < BOARD_SIZE; row++) {
+                                    // 跳过冻结的格子
+                                    if (currentBoard[row][col].frozenTurns > 0) {
+                                        skippedFrozen++;
+                                        continue;
+                                    }
+                                    // 记录清空的格子
+                                    if (currentBoard[row][col].value > 0 || currentBoard[row][col].type === CELL_TYPE.MONSTER) {
+                                        clearedCells++;
+                                    }
+                                    currentBoard[row][col] = {
+                                        value: 0,
+                                        type: CELL_TYPE.EMPTY,
+                                        monsterType: null,
+                                        frozenTurns: 0
+                                    };
+                                };
+                                setRefreshCounts(prev => ({
+                                    ...prev,
+                                    cols: prev.cols.map((count, idx) => idx === col ? count - 1 : count)
+                                }));
+                                addLog(`第${col + 1}列刷新：清空${clearedCells}个格子`, 'normal');
+                                if (skippedFrozen > 0) {
+                                    addLog(`跳过了${skippedFrozen}个冻结的格子`, 'warning');
+                                }
+                            } else {
+                                // 锁定该列，所有格子冻结
+                                for (let row = 0; row < BOARD_SIZE; row++) {
+                                    currentBoard[row][col].frozenTurns = 5;
+                                }
+                                addLog(`第${col + 1}列刷新次数耗尽，已锁定`, 'warning');
+                            }
+                        } else {
+                            // 有冲突，扣血
+                            damageTaken += 1;
+                        }
+                    }
+                }
+
+                // 检查九宫格
+                for (let boxRow = 0; boxRow < 3; boxRow++) {
+                    for (let boxCol = 0; boxCol < 3; boxCol++) {
+                        const values = [];
+                        let hasEmpty = false;
+                        let cells = [];
+
+                        for (let r = boxRow * 3; r < boxRow * 3 + 3; r++) {
+                            for (let c = boxCol * 3; c < boxCol * 3 + 3; c++) {
+                                cells.push({ row: r, col: c });
+                                if (currentBoard[r][c].value === 0) {
+                                    hasEmpty = true;
+                                    break;
+                                }
+                                values.push(currentBoard[r][c].value);
+                            }
+                        }
+
+                        if (!hasEmpty) {
+                            const uniqueValues = new Set(values);
+                            if (uniqueValues.size === 9) {
+                                const boxIndex = boxRow * 3 + boxCol;
+                                const areaType = boxAreas[boxIndex];
+
+                                hasCompleted = true;
+                                addLog(`九宫格${boxIndex + 1}完成！`, 'success');
+
+                                // 击杀瞄准的怪物
+                                killTargetedMonster();
+
+                                // 根据区域类型给予奖励
+                                if (areaType === AREA_TYPE.FARM) {
+                                    addLog('激活农场效果：每回合治疗2点', 'success');
+                                    completedAreas.push({ type: AREA_TYPE.FARM, turns: 3 });
+                                } else if (areaType === AREA_TYPE.MINE) {
+                                    addLog('激活矿洞效果：每回合获得2个随机数字', 'success');
+                                    completedAreas.push({ type: AREA_TYPE.MINE, turns: 3 });
+                                } else if (areaType === AREA_TYPE.FACTORY) {
+                                    addLog('激活工厂效果：每回合获得10分', 'success');
+                                    completedAreas.push({ type: AREA_TYPE.FACTORY, turns: 3 });
+                                }
+
+                                // 给予数字奖励（减少数量）
+                                const rewardCount = 4;  // 从9个减少到4个
+                                const rewardNumbers = [];
+                                for (let i = 0; i < rewardCount; i++) {
+                                    const num = Math.floor(Math.random() * 9) + 1;
+                                    newInventory[num] = (newInventory[num] || 0) + 1;
+                                    rewardNumbers.push(num);
+                                }
+                                addLog(`获得奖励：${rewardNumbers.join(', ')} 各1个`, 'success');
+                                setScore(prev => prev + 150);
+
+                                // 冻结所有格子
+                                for (const cell of cells) {
+                                    // 如果格子里有怪物，先移除怪物并记录
+                                    if (currentBoard[cell.row][cell.col].type === CELL_TYPE.MONSTER) {
+                                        const monsterType = currentBoard[cell.row][cell.col].monsterType;
+                                        const monsterName = monsterType === MONSTER_TYPE.ELITE ? '精英怪物' : '怪物';
+                                        addLog(`九宫格冻结：${monsterName}被困在冰中（${cell.row + 1}, ${cell.col + 1}）`, 'warning');
+                                        setScore(prev => prev + (monsterType === MONSTER_TYPE.ELITE ? 50 : 20));
+                                    }
+                                    // 冻结格子（无论是什么类型，都变成冻结的空格）
+                                    currentBoard[cell.row][cell.col] = {
+                                        value: currentBoard[cell.row][cell.col].value,
+                                        type: CELL_TYPE.NUMBER,  // 标记为数字格（冻结）
+                                        monsterType: null,
+                                        frozenTurns: 3
+                                    };
+                                }
+                            } else {
+                                // 有冲突，扣血
+                                damageTaken += 1;
+                            }
+                        }
+                    }
+                }
+
+                if (damageTaken > 0) {
+                    addLog(`数字冲突造成 ${damageTaken} 点伤害！`, 'danger');
+                    setPlayerHP(prev => Math.max(0, prev - damageTaken));
+                }
+
+                // 添加区域效果（限制同类型只能有一个）
+                setActiveAreaEffects(prev => {
+                    const newEffects = [...prev];
+                    for (const newEffect of completedAreas) {
+                        // 检查是否已有同类型的效果
+                        const existingIndex = newEffects.findIndex(e => e.type === newEffect.type);
+                        if (existingIndex !== -1) {
+                            // 已有同类型效果，重置为3回合
+                            newEffects[existingIndex].turns = newEffect.turns;
+                            addLog(`${newEffect.type === AREA_TYPE.FARM ? '农场' : newEffect.type === AREA_TYPE.MINE ? '矿洞' : '工厂'}效果重置为${newEffects[existingIndex].turns}回合`, 'success');
+                        } else {
+                            // 没有同类型效果，添加新效果
+                            newEffects.push(newEffect);
+                        }
+                    }
+                    return newEffects;
+                });
+
+                return { board: currentBoard, inventory: newInventory };
+            }, [inventory, refreshCounts, boxAreas, lineRewards, addLog, targetedMonster]);
+
+            // 放置数字
+            const placeNumber = useCallback((row, col) => {
+                if (selectedNumber === null) {
+                    addLog('请先选择一个数字', 'warning');
+                    return;
+                }
+
+                const cell = board[row][col];
+
+                // 检查是否冻结
+                if (cell.frozenTurns > 0) {
+                    addLog('该格子已冻结，无法操作', 'warning');
+                    return;
+                }
+
+                // 检查是否有库存
+                if (inventory[selectedNumber] <= 0) {
+                    addLog(`数字${selectedNumber}库存不足`, 'warning');
+                    return;
+                }
+
+                // 检查是否是怪物格（不能放置数字）
+                if (cell.type === CELL_TYPE.MONSTER) {
+                    addLog(`无法在怪物格上放置数字！请先完成行/列/九宫格击杀它。`, 'danger');
+                    setSelectedNumber(null);
+                    setSelectedCell(null);
+                    return;
+                }
+
+                const newBoard = board.map(row => row.map(cell => ({ ...cell })));
+                const newValue = operationMode === 'add'
+                    ? cell.value + selectedNumber
+                    : Math.max(0, cell.value - selectedNumber);
+
+                // 消耗数字
+                const newInventory = { ...inventory };
+                newInventory[selectedNumber]--;
+
+                if (cell.value === 0) {
+                    // 放置到空格
+                    newBoard[row][col] = {
+                        value: selectedNumber,
+                        type: CELL_TYPE.NUMBER,
+                        monsterType: null,
+                        frozenTurns: 0
+                    };
+                    addLog(`在(${row + 1}, ${col + 1})放置数字${selectedNumber}`, 'normal');
+                } else {
+                    // 对已有数字进行运算
+                    newBoard[row][col].value = newValue;
+                    addLog(`在(${row + 1}, ${col + 1})${operationMode === 'add' ? '加' : '减'}${selectedNumber}，结果为${newValue}`, 'normal');
+
+                    // 检查是否生成怪物（概率性）
+                    if (newValue >= 20 && cell.type !== CELL_TYPE.MONSTER) {
+                        // >=20必然转为精英怪物
+                        newBoard[row][col].type = CELL_TYPE.MONSTER;
+                        newBoard[row][col].monsterType = MONSTER_TYPE.ELITE;
+                        addLog(`(${row + 1}, ${col + 1})生成精英怪物！`, 'danger');
+                    } else if (newValue >= 10 && newValue < 20 && cell.type !== CELL_TYPE.MONSTER) {
+                        // 10-19之间，60%概率生成怪物
+                        if (Math.random() < 0.6) {
+                            newBoard[row][col].type = CELL_TYPE.MONSTER;
+                            newBoard[row][col].monsterType = MONSTER_TYPE.NORMAL;
+                            addLog(`(${row + 1}, ${col + 1})生成普通怪物！`, 'danger');
+                        } else {
+                            addLog(`(${row + 1}, ${col + 1})幸运！没有生成怪物`, 'success');
+                        }
+                    }
+                }
+
+                // 检查是否造成冲突（立即扣血）
+                const conflicts = checkConflictsAt(newBoard, row, col);
+                if (conflicts > 0) {
+                    const damage = conflicts;
+                    addLog(`数字冲突造成 ${damage} 点伤害！`, 'danger');
+                    setPlayerHP(prev => Math.max(0, prev - damage));
+                }
+
+                setSelectedNumber(null);
+                setSelectedCell(null);
+
+                // 检查完成情况，传入已经减少库存的inventory
+                const completionResult = checkCompletions(newBoard, newInventory);
+
+                setBoard(completionResult.board);
+                setInventory(completionResult.inventory);
+
+                // 推进回合
+                setTurn(prev => {
+                    const newTurn = prev + 1;
+                    turnRef.current = newTurn;
+                    return newTurn;
+                });
+            }, [selectedNumber, inventory, board, operationMode, checkCompletions, addLog]);
+
+            // 回合结束处理
+            useEffect(() => {
+                if (turn === 1) return; // 第一回合不执行
+
+                const newBoard = board.map(row => row.map(cell => ({ ...cell })));
+                let totalDamage = 0;
+                let spawnedMonsters = 0;
+
+                // 处理怪物成长和攻击
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    for (let col = 0; col < BOARD_SIZE; col++) {
+                        const cell = newBoard[row][col];
+
+                        // 怪物行动
+                        if (cell.type === CELL_TYPE.MONSTER) {
+                            // 自身和4邻域+1
+                            cell.value += 1;
+                            const neighbors = [
+                                [row - 1, col],
+                                [row + 1, col],
+                                [row, col - 1],
+                                [row, col + 1]
+                            ];
+                            for (const [nr, nc] of neighbors) {
+                                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                                    newBoard[nr][nc].value += 1;
+                                }
+                            }
+
+                            // 造成伤害（增加怪物伤害）
+                            const damage = cell.monsterType === MONSTER_TYPE.ELITE ? 5 : 2;
+                            totalDamage += damage;
+                        }
+
+                        // 解冻处理
+                        if (cell.frozenTurns > 0) {
+                            cell.frozenTurns--;
+                            if (cell.frozenTurns === 0 && cell.type !== CELL_TYPE.MONSTER) {
+                                cell.value = 0;
+                                cell.type = CELL_TYPE.EMPTY;
+                            }
+                        }
+                    }
+                }
+
+                // 检查怪物成长后是否有格子需要转换为怪物
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    for (let col = 0; col < BOARD_SIZE; col++) {
+                        const cell = newBoard[row][col];
+                        if (cell.type !== CELL_TYPE.MONSTER) {
+                            if (cell.value >= 20) {
+                                // >=20必然转为精英怪物
+                                newBoard[row][col].type = CELL_TYPE.MONSTER;
+                                newBoard[row][col].monsterType = MONSTER_TYPE.ELITE;
+                                addLog(`(${row + 1}, ${col + 1})因怪物影响生成精英怪物！`, 'danger');
+                                spawnedMonsters++;
+                            } else if (cell.value >= 10 && cell.value < 20) {
+                                // 10-19范围：60%概率生成怪物
+                                if (Math.random() < 0.6) {
+                                    newBoard[row][col].type = CELL_TYPE.MONSTER;
+                                    newBoard[row][col].monsterType = MONSTER_TYPE.NORMAL;
+                                    addLog(`(${row + 1}, ${col + 1})因怪物影响生成怪物！`, 'danger');
+                                    spawnedMonsters++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 随机事件：格子数字+1（增加概率）
+                if (Math.random() < 0.2) {
+                    const randomRow = Math.floor(Math.random() * BOARD_SIZE);
+                    const randomCol = Math.floor(Math.random() * BOARD_SIZE);
+                    newBoard[randomRow][randomCol].value += 1;
+                    addLog(`随机事件：(${randomRow + 1}, ${randomCol + 1})数字+1`, 'warning');
+
+                    // 检查是否生成怪物（概率性）
+                    if (newBoard[randomRow][randomCol].value >= 20 &&
+                        newBoard[randomRow][randomCol].type !== CELL_TYPE.MONSTER) {
+                        newBoard[randomRow][randomCol].type = CELL_TYPE.MONSTER;
+                        newBoard[randomRow][randomCol].monsterType = MONSTER_TYPE.ELITE;
+                        addLog(`(${randomRow + 1}, ${randomCol + 1})生成精英怪物！`, 'danger');
+                        spawnedMonsters++;
+                    } else if (newBoard[randomRow][randomCol].value >= 10 &&
+                        newBoard[randomRow][randomCol].value < 20 &&
+                        newBoard[randomRow][randomCol].type !== CELL_TYPE.MONSTER) {
+                        // 60%概率生成怪物
+                        if (Math.random() < 0.6) {
+                            newBoard[randomRow][randomCol].type = CELL_TYPE.MONSTER;
+                            newBoard[randomRow][randomCol].monsterType = MONSTER_TYPE.NORMAL;
+                            addLog(`(${randomRow + 1}, ${randomCol + 1})生成怪物！`, 'danger');
+                            spawnedMonsters++;
+                        } else {
+                            addLog(`(${randomRow + 1}, ${randomCol + 1})幸运逃脱！`, 'success');
+                        }
+                    }
+                }
+
+                // 随机生成怪物（增加概率到15%）
+                if (Math.random() < 0.15) {
+                    const emptyCells = [];
+                    for (let row = 0; row < BOARD_SIZE; row++) {
+                        for (let col = 0; col < BOARD_SIZE; col++) {
+                            if (newBoard[row][col].type === CELL_TYPE.EMPTY) {
+                                emptyCells.push({ row, col });
+                            }
+                        }
+                    }
+                    if (emptyCells.length > 0) {
+                        const { row, col } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                        newBoard[row][col].type = CELL_TYPE.MONSTER;
+                        newBoard[row][col].monsterType = MONSTER_TYPE.NORMAL;
+                        newBoard[row][col].value = 5;
+                        addLog(`随机生成怪物在(${row + 1}, ${col + 1})`, 'danger');
+                        spawnedMonsters++;
+                    }
+                }
+
+                // 每10回合增加刷新次数（延长间隔）
+                if (turn % 10 === 0) {
+                    setRefreshCounts(prev => ({
+                        rows: prev.rows.map(count => Math.min(count + 1, 3)),
+                        cols: prev.cols.map(count => Math.min(count + 1, 3))
+                    }));
+                    addLog('所有行列的刷新次数+1', 'success');
+                }
+
+                // 处理区域效果
+                setActiveAreaEffects(prevEffects => {
+                    // 创建新数组，正确处理回合数减少
+                    const newEffects = prevEffects.map(effect => ({
+                        ...effect,
+                        turns: effect.turns - 1
+                    })).filter(effect => {
+                        // 只处理回合数>0的效果
+                        if (effect.turns <= 0) return false;
+
+                        // 应用效果
+                        if (effect.type === AREA_TYPE.FARM) {
+                            setPlayerHP(prevHP => Math.min(INITIAL_HP, prevHP + 2));  // 提高到2点
+                            addLog(`农场效果：治疗2点（剩余${effect.turns}回合）`, 'success');
+                        } else if (effect.type === AREA_TYPE.MINE) {
+                            setInventory(prevInv => {
+                                const newInv = { ...prevInv };
+                                const numbers = [];
+                                for (let i = 0; i < 2; i++) {
+                                    const num = Math.floor(Math.random() * 9) + 1;
+                                    newInv[num] = (newInv[num] || 0) + 1;
+                                    numbers.push(num);
+                                }
+                                addLog(`⛏️ 矿洞效果：获得${numbers.join(',')}（剩余${effect.turns}回合）`, 'success');
+                                return newInv;
+                            });
+                        } else if (effect.type === AREA_TYPE.FACTORY) {
+                            setScore(prev => prev + 10);
+                            addLog(`工厂效果：获得10分（剩余${effect.turns}回合）`, 'success');
+                        }
+
+                        return true;
+                    });
+
+                    return newEffects;
+                });
+
+                // 应用伤害
+                if (totalDamage > 0) {
+                    addLog(`怪物造成 ${totalDamage} 点伤害！`, 'danger');
+                    setPlayerHP(prev => Math.max(0, prev - totalDamage));
+                }
+
+                setBoard(newBoard);
+            }, [turn]);
+
+            // 跳过回合
+            const skipTurn = () => {
+                setTurn(prev => {
+                    const newTurn = prev + 1;
+                    turnRef.current = newTurn;
+                    return newTurn;
+                });
+                addLog('跳过回合', 'normal');
+            };
+
+            // 选择格子
+            const selectCell = (row, col) => {
+                const cell = board[row][col];
+
+                // 如果已选择数字，放置数字
+                if (selectedNumber !== null) {
+                    placeNumber(row, col);
+                    return;
+                }
+
+                // 如果点击的是怪物，设置/取消瞄准
+                if (cell.type === CELL_TYPE.MONSTER) {
+                    if (targetedMonster?.row === row && targetedMonster?.col === col) {
+                        // 取消瞄准
+                        setTargetedMonster(null);
+                        addLog(`取消瞄准怪物`, 'normal');
+                    } else {
+                        // 设置瞄准
+                        setTargetedMonster({ row, col });
+                        const monsterName = cell.monsterType === MONSTER_TYPE.ELITE ? '精英怪物' : '怪物';
+                        addLog(`瞄准了${monsterName}！完成后会击杀它`, 'success');
+                    }
+                    setSelectedCell(null);
+                } else {
+                    // 普通格子，选择/取消选择
+                    setSelectedCell(selectedCell?.row === row && selectedCell?.col === col ? null : { row, col });
+                    // 如果选择新格子，清除瞄准
+                    setTargetedMonster(null);
+                }
+            };
+
+            // 渲染单个格子
+            const renderCell = (row, col) => {
+                const cell = board[row][col];
+                const border = isBoxBorder(row, col);
+                const isSelected = selectedCell?.row === row && selectedCell?.col === col;
+                const isTargeted = targetedMonster?.row === row && targetedMonster?.col === col;
+
+                // 检查是否是九宫格的左上角
+                const isBoxCorner = row % 3 === 0 && col % 3 === 0;
+                const boxIndex = getBoxIndex(row, col);
+                const areaType = boxAreas[boxIndex];
+
+                // 根据区域类型设置背景色
+                const getAreaBackgroundColor = () => {
+                    if (cell.type === CELL_TYPE.MONSTER) return '#ffebee';
+                    if (cell.frozenTurns > 0) return '#e1f5fe';
+                    if (areaType === AREA_TYPE.FARM) return '#c8e6c9';  // 深绿色
+                    if (areaType === AREA_TYPE.MINE) return '#ffe0b2';  // 深橙色
+                    if (areaType === AREA_TYPE.FACTORY) return '#b3e5fc';  // 深蓝色
+                    return cell.type === CELL_TYPE.EMPTY ? '#f0f0f0' : '#e3f2fd';
+                };
+
+                let cellClass = `cell ${cell.type}`;
+                if (cell.frozenTurns > 0) cellClass += ' frozen';
+                if (border.right) cellClass += ' box-border-right';
+                if (border.bottom) cellClass += ' box-border-bottom';
+                if (isSelected) cellClass += ' selected';
+                if (isTargeted) cellClass += ' targeted';
+
+                return (
+                    <div
+                        key={`${row}-${col}`}
+                        className={cellClass}
+                        onClick={() => selectCell(row, col)}
+                        style={{
+                            backgroundColor: getAreaBackgroundColor()
+                        }}
+                    >
+                        {cell.value > 0 ? cell.value : ''}
+                        {cell.frozenTurns > 0 && <span style={{ fontSize: '10px', position: 'absolute', bottom: '1px' }}>{cell.frozenTurns}</span>}
+                        {isTargeted && <span style={{ fontSize: '12px', position: 'absolute', top: '1px', left: '1px' }}>🎯</span>}
+                        {isBoxCorner && (
+                            <span style={{
+                                fontSize: '11px',
+                                position: 'absolute',
+                                top: '1px',
+                                right: '1px',
+                                opacity: 0.8
+                            }}>
+                                {areaType === AREA_TYPE.FARM ? '🌾' :
+                                    areaType === AREA_TYPE.MINE ? '⛏️' :
+                                        areaType === AREA_TYPE.FACTORY ? '🏭' : ''}
+                            </span>
+                        )}
+                    </div>
+                );
+            };
+
+            // 检查数字是否耗尽
+            const totalInventory = Object.values(inventory).reduce((sum, count) => sum + count, 0);
+            const isOutOfNumbers = totalInventory === 0 && turn > 1;  // 第1回合不检查
+
+            // 游戏结束
+            if (playerHP <= 0 || isOutOfNumbers) {
+                const deathReason = playerHP <= 0 ? '你被怪物击败了！' : '你的数字已经用完了！';
+                const deathIcon = playerHP <= 0 ? '💀' : '📦';
+
+                return (
+                    <div className="container">
+                        <h1>游戏结束</h1>
+                        <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
+                            <h2 style={{ fontSize: '32px', marginBottom: '20px' }}>{deathIcon}</h2>
+                            <p style={{ fontSize: '24px', marginBottom: '10px' }}>{deathReason}</p>
+                            <p style={{ fontSize: '20px', color: '#667eea' }}>最终得分：{score}</p>
+                            <p style={{ fontSize: '16px', color: '#666' }}>存活回合：{turn}</p>
+                            <button
+                                className="btn btn-primary"
+                                style={{ marginTop: '20px', padding: '15px 30px', fontSize: '18px' }}
+                                onClick={() => window.location.reload()}
+                            >
+                                重新开始
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="container">
+                    <h1>🎮 数独</h1>
+
+                    <div className="game-layout">
+                        <div className="board-section">
+                            <div className="sudoku-board">
+                                {/* 左上角空白 */}
+                                <div className="corner-label"></div>
+
+                                {/* 列标签 */}
+                                {board[0].map((_, colIndex) => (
+                                    <div key={`col-${colIndex}`} className="col-label">
+                                        <span className="line-number">{colIndex + 1}</span>
+                                        <span className="reward-number">
+                                            🎁{lineRewards.cols[colIndex].number}×{lineRewards.cols[colIndex].count}
+                                        </span>
+                                        <span className={`refresh-count ${refreshCounts.cols[colIndex] === 0 ? 'zero' : ''}`}>
+                                            刷新{refreshCounts.cols[colIndex]}
+                                        </span>
+                                    </div>
+                                ))}
+
+                                {/* 行标签和格子 */}
+                                {board.map((row, rowIndex) => {
+                                    const elements = [];
+
+                                    // 行标签
+                                    elements.push(
+                                        <div key={`row-${rowIndex}`} className="row-label">
+                                            <span className="line-number">{rowIndex + 1}</span>
+                                            <span className="reward-number">
+                                                🎁{lineRewards.rows[rowIndex].number}×{lineRewards.rows[rowIndex].count}
+                                            </span>
+                                            <span className={`refresh-count ${refreshCounts.rows[rowIndex] === 0 ? 'zero' : ''}`}>
+                                                刷新{refreshCounts.rows[rowIndex]}
+                                            </span>
+                                        </div>
+                                    );
+
+                                    // 该行的所有格子
+                                    for (let colIndex = 0; colIndex < 9; colIndex++) {
+                                        elements.push(renderCell(rowIndex, colIndex));
+                                    }
+
+                                    return elements;
+                                })}
+                            </div>
+
+                            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                                <p><strong>操作说明：</strong></p>
+                                <p style={{ fontSize: '14px', color: '#666' }}>
+                                    1. 点击下方数字选择要放置的数字<br />
+                                    2. 点击棋盘格子放置数字<br />
+                                    3. 对已有数字格可以进行加/减运算<br />
+                                    4. 完成行/列/九宫格获得奖励
+                                </p>
+                                <p style={{ marginTop: '15px', fontWeight: 'bold' }}>九宫格区域：</p>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '12px' }}>
+                                    <span style={{ background: '#c8e6c9', padding: '4px 8px', borderRadius: '3px' }}>🌾 农场（治疗2点）</span>
+                                    <span style={{ background: '#ffe0b2', padding: '4px 8px', borderRadius: '3px' }}>⛏️ 矿洞（2个数字）</span>
+                                    <span style={{ background: '#b3e5fc', padding: '4px 8px', borderRadius: '3px' }}>🏭 工厂（10分）</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="sidebar">
+                            <div className="panel">
+                                <h2>📊 状态</h2>
+                                <div className="stats">
+                                    <div className="stat">
+                                        <div className="stat-label">分数</div>
+                                        <div className="stat-value">{score}</div>
+                                    </div>
+                                    <div className="stat">
+                                        <div className="stat-label">回合</div>
+                                        <div className="stat-value">{turn}</div>
+                                    </div>
+                                    <div className="stat">
+                                        <div className="stat-label">生命值</div>
+                                        <div className="stat-value" style={{ color: playerHP < 30 ? '#f44336' : '#667eea' }}>
+                                            {playerHP}
+                                        </div>
+                                    </div>
+                                    <div className="stat">
+                                        <div className="stat-label">数字总数</div>
+                                        <div className="stat-value" style={{
+                                            color: totalInventory < 5 ? '#f44336' : totalInventory < 10 ? '#ff9800' : '#4caf50'
+                                        }}>
+                                            {totalInventory}
+                                        </div>
+                                    </div>
+                                    <div className="stat">
+                                        <div className="stat-label">怪物数</div>
+                                        <div className="stat-value" style={{ color: '#ef5350' }}>
+                                            {board.flat().filter(c => c.type === CELL_TYPE.MONSTER).length}
+                                        </div>
+                                    </div>
+                                </div>
+                                {targetedMonster && (
+                                    <div style={{ marginTop: '10px', padding: '8px', background: '#ffebee', borderRadius: '5px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '12px', color: '#666' }}>🎯 当前瞄准</div>
+                                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#f44336' }}>
+                                            {(() => {
+                                                const cell = board[targetedMonster.row][targetedMonster.col];
+                                                const monsterName = cell.monsterType === MONSTER_TYPE.ELITE ? '精英怪物' : '怪物';
+                                                return `${monsterName} (${targetedMonster.row + 1}, ${targetedMonster.col + 1})`;
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
+                                {activeAreaEffects.length > 0 && (
+                                    <div style={{ marginTop: '10px', padding: '8px', background: '#e3f2fd', borderRadius: '5px' }}>
+                                        <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>✨ 激活效果</div>
+                                        {activeAreaEffects.map((effect, idx) => {
+                                            const icon = effect.type === AREA_TYPE.FARM ? '🌾' :
+                                                effect.type === AREA_TYPE.MINE ? '⛏️' :
+                                                    effect.type === AREA_TYPE.FACTORY ? '🏭' : '';
+                                            const name = effect.type === AREA_TYPE.FARM ? '农场' :
+                                                effect.type === AREA_TYPE.MINE ? '矿洞' :
+                                                    effect.type === AREA_TYPE.FACTORY ? '工厂' : '';
+                                            return (
+                                                <div key={idx} style={{ fontSize: '11px', color: '#667eea', textAlign: 'center', marginTop: '4px' }}>
+                                                    {icon} {name} {effect.turns}回合
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="panel">
+                                <h2>🎒 数字库存</h2>
+                                <div className="inventory">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                                        <div
+                                            key={num}
+                                            className={`inventory-item ${selectedNumber === num ? 'selected' : ''}`}
+                                            onClick={() => setSelectedNumber(selectedNumber === num ? null : num)}
+                                        >
+                                            <div className="inventory-number">{num}</div>
+                                            <div className="inventory-count">x{inventory[num] || 0}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="mode-selector" style={{ marginTop: '15px' }}>
+                                    <button
+                                        className={`mode-btn ${operationMode === 'add' ? 'active' : ''}`}
+                                        onClick={() => setOperationMode('add')}
+                                    >
+                                        ➕ 加法模式
+                                    </button>
+                                    <button
+                                        className={`mode-btn ${operationMode === 'subtract' ? 'active' : ''}`}
+                                        onClick={() => setOperationMode('subtract')}
+                                    >
+                                        ➖ 减法模式
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="panel">
+                                <h2>🎮 控制</h2>
+                                <div className="controls">
+                                    <button className="btn btn-secondary" onClick={skipTurn}>
+                                        ⏭️ 跳过回合
+                                    </button>
+                                    <button className="btn btn-danger" onClick={() => window.location.reload()}>
+                                        🔄 重新开始
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="panel">
+                                <h2>📜 游戏日志</h2>
+                                <div className="game-log">
+                                    {gameLog.slice().reverse().map((entry, idx) => (
+                                        <div key={idx} className={`log-entry ${entry.type}`}>
+                                            <strong>[T{entry.turn}]</strong> {entry.message}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 渲染应用
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Game />);
+    </script>
+</body>
+
+</html>
